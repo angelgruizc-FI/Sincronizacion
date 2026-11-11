@@ -15,7 +15,7 @@
 
   /* Pega aquí la URL de tu base de datos, p. ej. "https://dunne-expo-default-rtdb.firebaseio.com" (sin / al final).
      Déjala vacía ("") para usar solo varias ventanas en la misma computadora. */
-  var FIREBASE_URL = "https://console.firebase.google.com/project/simulaciones-sincro/database/simulaciones-sincro-default-rtdb/data/~2F";
+  var FIREBASE_URL = "https://simulaciones-sincro-default-rtdb.firebaseio.com/";
 
   var P = new URLSearchParams(location.search);
   var ROL = P.get("rol");
