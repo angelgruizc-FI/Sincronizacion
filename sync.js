@@ -91,4 +91,142 @@
     while (el && el.nodeType === 1 && el !== document.body) {
       if (el.id && document.getElementById(el.id) === el) { parts.unshift("#" + CSS.escape(el.id)); break; }
       var i = 1, s = el; while ((s = s.previousElementSibling)) i++;
-      parts.unshift(el.tagName.toLowerCase() +
+      parts.unshift(el.tagName.toLowerCase() + ":nth-child(" + i + ")");
+      el = el.parentElement;
+    }
+    return parts.join(">");
+  }
+  function snapshot() {
+    var S = window.__sim, out = {};
+    if (!S) return out;
+    Object.keys(S).forEach(function (k) {
+      var v = S[k], t = typeof v;
+      if (SKIP_KEYS[k]) return;
+      if (v === null || t === "number" || t === "boolean" || t === "string") out[k] = v;
+    });
+    return out;
+  }
+
+  /* ================= PANEL ================= */
+  var badge;
+  function panelInit() {
+    badge = document.createElement("div");
+    badge.style.cssText = "position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;padding:4px 12px;border-radius:99px;" +
+      "font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.7);" +
+      "border:1px solid rgba(255,255,255,.2);color:#e8ecf4;pointer-events:none";
+    document.body.appendChild(badge);
+    setInterval(drawBadge, 700); drawBadge();
+    panelLayout();
+
+    var pending = null;
+    function sendState() { send({ type: "state", page: PAGE, S: snapshot(), ts: Date.now() }); }
+    function soon() { clearTimeout(pending); pending = setTimeout(sendState, 120); }
+
+    document.addEventListener("click", function (e) {
+      if (!e.isTrusted) return;
+      var b = e.target.closest && e.target.closest("button,[data-v]");
+      if (!b || b.id === "sound" || b.closest("#xrBtn")) return;
+      send({ type: "evt", id: UID + ":" + (++evtN), k: "click", sel: pathOf(b) });
+      soon();
+    }, true);
+
+    var lastSet = {};
+    function onSet(e) {
+      if (!e.isTrusted) return;
+      var t = e.target; if (!t || !t.tagName || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.id === "sound") return;
+      var sel = pathOf(t), now = Date.now();
+      if (e.type === "input" && t.type === "range" && now - (lastSet[sel] || 0) < 90) return;   // limitar sliders
+      lastSet[sel] = now;
+      send({ type: "evt", id: UID + ":" + (++evtN), k: "set", ev: e.type, sel: sel, value: t.value, checked: !!t.checked });
+      soon();
+    }
+    document.addEventListener("input", onSet, true);
+    document.addEventListener("change", onSet, true);
+
+    setInterval(sendState, 1000);
+    sendState();
+    handlers.push(function (m) {
+      if (m.type === "hello") sendState();
+      else if (m.type === "ack") lastAck = Date.now();
+    });
+  }
+  /* Panel: explicación grande a la derecha; el cerebro queda como vista previa pequeña a la izquierda */
+  var PREV = 0.3, PANEL_W = 0.56;   // tamaño de la vista previa (fracción de la pantalla) y ancho de la explicación
+  function panelLayout() {
+    if (!document.getElementById("panel")) return;       // p. ej. visor.html: no se toca
+    var st = document.createElement("style");
+    var colW = "calc(100vw - " + (PANEL_W * 100) + "vw - 48px)";
+    st.textContent = "@media(min-width:900px){" +
+      "#panel{zoom:1.3;width:calc(" + (PANEL_W * 100) + "vw/1.3)!important;max-width:none!important}" +
+      "#dock,#start{right:auto!important;left:16px!important;width:" + colW + "!important}" +
+      "header{max-width:" + colW + "!important}}";
+    document.head.appendChild(st);
+    function place() {
+      var cv = document.getElementById("c"), dock = document.getElementById("dock");
+      if (!cv) return;
+      if (innerWidth < 900) { cv.style.transform = ""; return; }
+      var W = innerWidth, H = innerHeight, s = PREV, colPx = W - W * PANEL_W - 48;
+      var left = 16 + Math.max(0, (colPx - W * s) / 2) + 190 * s;   // 190 = desplazamiento que el sitio le da al cerebro
+      var up = H - (dock ? dock.getBoundingClientRect().top : H - 16) + 8;
+      cv.style.transformOrigin = "0 100%";
+      cv.style.transform = "translate(" + left + "px," + (-up) + "px) scale(" + s + ")";
+    }
+    place(); addEventListener("resize", place); setInterval(place, 800);
+  }
+  function drawBadge() {
+    if (!badge) return;
+    var ok = Date.now() - lastAck < 6000;
+    badge.innerHTML = '<span style="color:' + (ok ? "#5fe3a1" : "#ff8419") + '">●</span> sala ' + SALA +
+      " · pantalla cerebro: " + (ok ? "conectada" : "esperando…") + (FB ? " · red" : " · local");
+  }
+
+  /* ================= CEREBRO ================= */
+  function viewerInit() {
+    var st = document.createElement("style");
+    st.textContent =
+      ".topbar,header,#panel,#dock,#start,#tip,#xrBtn,.foot{display:none!important}" +
+      "html,body{cursor:none}" +
+      "@media(min-width:761px){canvas#c,canvas{transform:translateX(190px)}}";   // recentra el cerebro (el sitio lo desplaza a la izquierda para dejar sitio al panel)
+    document.head.appendChild(st);
+
+    var dot = document.createElement("div");
+    dot.style.cssText = "position:fixed;left:8px;bottom:8px;width:8px;height:8px;border-radius:50%;z-index:60;background:#ff8419;opacity:.55;pointer-events:none";
+    document.body.appendChild(dot);
+    setInterval(function () { dot.style.background = Date.now() - lastRecv < 4000 ? "#5fe3a1" : "#ff8419"; }, 800);
+
+    addEventListener("dblclick", function () {
+      var d = document.documentElement;
+      if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {});
+    });
+
+    var el;
+    handlers.push(function (m) {
+      if (m.type === "state") {
+        if (m.page && m.page !== PAGE) { location.replace(urlFor(m.page)); return; }
+        var S = window.__sim; if (!S || !m.S) return;
+        Object.keys(m.S).forEach(function (k) { if (!SKIP_KEYS[k]) S[k] = m.S[k]; });
+      } else if (m.type === "evt") {
+        if (seenEvt[m.id]) return; seenEvt[m.id] = 1;
+        try { el = document.querySelector(m.sel); } catch (e) { el = null; }
+        if (!el || el.id === "rot") return;       // el giro lo controla esta pantalla
+        if (m.k === "click") el.click();
+        else if (m.k === "set") {
+          if (el.type === "checkbox" || el.type === "radio") el.checked = !!m.checked; else el.value = m.value;
+          el.dispatchEvent(new Event(m.ev || "input", { bubbles: true }));
+        }
+      }
+    });
+    function spin() {                            // el cerebro siempre gira en esta pantalla
+      var r = document.getElementById("rot");
+      if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); }
+    }
+    setInterval(spin, 1000); spin();
+    function mute() { var S = window.__sim; if (S && "sound" in S) S.sound = false; }
+    setInterval(mute, 300);
+    setInterval(function () { send({ type: "ack", ts: Date.now() }); }, 2000);
+    send({ type: "hello" }); send({ type: "ack", ts: Date.now() });
+  }
+
+  listenFirebase();
+  if (isPanel) panelInit(); else viewerInit();
+})();
