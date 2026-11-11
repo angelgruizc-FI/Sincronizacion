@@ -111,7 +111,7 @@
   var badge;
   function panelInit() {
     badge = document.createElement("div");
-    badge.style.cssText = "position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;padding:4px 12px;border-radius:99px;" +
+    badge.style.cssText = "position:fixed;right:12px;top:12px;z-index:60;padding:4px 12px;border-radius:99px;" +
       "font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.7);" +
       "border:1px solid rgba(255,255,255,.2);color:#e8ecf4;pointer-events:none";
     document.body.appendChild(badge);
@@ -150,28 +150,29 @@
       else if (m.type === "ack") lastAck = Date.now();
     });
   }
-  /* Panel: explicación grande a la derecha; el cerebro queda como vista previa pequeña a la izquierda */
-  var PREV = 0.3, PANEL_W = 0.56;   // tamaño de la vista previa (fracción de la pantalla) y ancho de la explicación
+  /* Panel (pantalla vertical): sin cerebro; todo en una sola columna: título → datos de la simulación → explicación → controles */
   function panelLayout() {
     if (!document.getElementById("panel")) return;       // p. ej. visor.html: no se toca
     var st = document.createElement("style");
-    var colW = "calc(100vw - " + (PANEL_W * 100) + "vw - 48px)";
-    st.textContent = "@media(min-width:900px){" +
-      "#panel{zoom:1.3;width:calc(" + (PANEL_W * 100) + "vw/1.3)!important;max-width:none!important}" +
-      "#dock,#start{right:auto!important;left:16px!important;width:" + colW + "!important}" +
-      "header{max-width:" + colW + "!important}}";
+    st.textContent =
+      "html,body{height:100%}" +
+      "body{display:flex!important;flex-direction:column!important;gap:10px!important;padding:64px 16px 16px!important;overflow:hidden!important}" +
+      "canvas#c{visibility:hidden!important;pointer-events:none!important}" +
+      "canvas#trace,#lnk,#tip,#start{display:none!important}" +
+      "header,#ideas,#panel,#dock,#tap{position:static!important;inset:auto!important;transform:none!important;margin:0!important;" +
+        "width:auto!important;max-width:none!important;flex:none}" +
+      "header{pointer-events:auto!important}" +
+      "#tap{align-self:center;width:max-content!important}" +
+      "#panel{flex:1 1 0!important;min-height:0!important;max-height:none!important;zoom:1.45}" +
+      "#steps{display:grid!important}";
     document.head.appendChild(st);
-    function place() {
-      var cv = document.getElementById("c"), dock = document.getElementById("dock");
-      if (!cv) return;
-      if (innerWidth < 900) { cv.style.transform = ""; return; }
-      var W = innerWidth, H = innerHeight, s = PREV, colPx = W - W * PANEL_W - 48;
-      var left = 16 + Math.max(0, (colPx - W * s) / 2) + 190 * s;   // 190 = desplazamiento que el sitio le da al cerebro
-      var up = H - (dock ? dock.getBoundingClientRect().top : H - 16) + 8;
-      cv.style.transformOrigin = "0 100%";
-      cv.style.transform = "translate(" + left + "px," + (-up) + "px) scale(" + s + ")";
-    }
-    place(); addEventListener("resize", place); setInterval(place, 800);
+    /* El cerebro no se ve en el panel: se omiten los dibujos 3D para no gastar la tarjeta gráfica (la simulación sigue corriendo igual). */
+    [window.WebGL2RenderingContext, window.WebGLRenderingContext].forEach(function (C) {
+      if (!C) return;
+      ["drawElements", "drawArrays", "drawElementsInstanced", "drawArraysInstanced", "drawRangeElements"].forEach(function (k) {
+        if (C.prototype[k]) C.prototype[k] = function () {};
+      });
+    });
   }
   function drawBadge() {
     if (!badge) return;
