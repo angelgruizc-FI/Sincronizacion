@@ -1,0 +1,29 @@
+DUNNE · Sincronización de pantallas
+===================================
+
+QUÉ SUBIR A GITHUB (repositorio Dunne-Simulaciones-RA, "Add file > Upload files", reemplazando):
+  sync.js  pantallas.html  index.html  circuito.html  escucha.html  divergente.html
+  modos.html  humor.html  flow.html  visor.html
+(cerebro.glb, model-viewer.min.js y sw.js NO cambian.)
+
+CÓMO USARLO EL DÍA DE LA EXPOSICIÓN
+  1. En cada computadora abre  la dirección de tu sitio en GitHub Pages terminada en /pantallas.html
+  2. Compu del panel  -> botón "Panel de control".
+  3. Compu del cerebro -> botón "Solo el cerebro" (doble clic = pantalla completa).
+  4. Todo lo que hagas en el panel (iniciar, fases, pausa, velocidad, transparencia, vistas, mano,
+     cambio de simulación) se copia solo en la pantalla del cerebro.
+  Arriba, el panel muestra un aviso verde "pantalla cerebro: conectada". En la pantalla del cerebro
+  hay un puntito verde abajo a la izquierda (naranja = no recibe datos).
+  Las gafas Quest siguen usando el sitio normal, sin ?rol=.
+
+DOS COMPUTADORAS (Firebase, gratis)
+  1. console.firebase.google.com > Agregar proyecto (sin Analytics).
+  2. Compilación > Realtime Database > Crear base de datos.
+  3. Pestaña "Reglas", pegar y publicar:
+        { "rules": { "salas": { ".read": true, ".write": true } } }
+  4. Copiar la URL de la base (https://algo-default-rtdb.firebaseio.com) y pegarla en sync.js
+     en la línea  var FIREBASE_URL = "";   (o en pantallas.html > Opciones de red).
+  Sin Firebase también funciona, pero solo entre ventanas de la MISMA computadora.
+
+  Cualquiera que conozca el nombre de la sala podría mover tus pantallas: usa un nombre poco obvio
+  (ej. dunne-expo-7391) y borra el proyecto de Firebase al terminar.

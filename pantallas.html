@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DUNNE · Elegir pantalla</title>
+<style>
+:root{--bg:#0a0e15;--bg2:#141c2b;--ink:#e8ecf4;--mute:#8d99ae;--line:rgba(255,255,255,.14);--acc:#ff8419}
+*{box-sizing:border-box}
+html,body{min-height:100%;margin:0}
+body{background:radial-gradient(120% 90% at 70% 20%,var(--bg2),var(--bg));color:var(--ink);font:19px/1.5 Palatino,"Palatino Linotype","Book Antiqua",Georgia,serif;display:grid;place-items:center;padding:24px}
+main{width:min(720px,100%)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.08em;text-transform:uppercase;font-size:13px;color:var(--mute)}
+h1{font-weight:400;font-size:clamp(28px,5vw,42px);line-height:1.1;margin:6px 0 10px}
+h1 em{color:var(--acc);font-style:normal}
+p{color:#c9d1e0;margin:0 0 18px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:22px 0}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+.big{all:unset;box-sizing:border-box;cursor:pointer;display:block;padding:22px 20px;border:1px solid var(--line);border-radius:16px;background:rgba(14,20,31,.7);transition:.2s}
+.big:hover,.big:focus-visible{border-color:var(--acc);outline:none;transform:translateY(-2px)}
+.big b{display:block;font-weight:400;font-size:26px;margin-bottom:4px}
+.big span{color:var(--mute);font-size:16px}
+.big.pri{background:var(--acc);border-color:var(--acc);color:#1a0f00}
+.big.pri span{color:#4a2a00}
+label{display:block;margin:14px 0 6px}
+input,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(14,20,31,.9);color:var(--ink);font:16px ui-monospace,Menlo,Consolas,monospace}
+details{margin-top:14px;color:var(--mute);font-size:16px}
+summary{cursor:pointer}
+.note{font-size:15px;color:var(--mute);margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+  <div class="mono">DUNNE · exposición</div>
+  <h1>¿Qué <em>pantalla</em> es esta?</h1>
+  <p>Abre esta misma página en cada computadora. El panel manda; la pantalla del cerebro copia lo que haga el panel.</p>
+  <div class="grid">
+    <button class="big pri" id="bPanel" type="button"><b>Panel de control</b><span>Botones, explicación y fases. Aquí se maneja todo.</span></button>
+    <button class="big" id="bCerebro" type="button"><b>Solo el cerebro</b><span>Pantalla limpia que sigue al panel. Doble clic = pantalla completa.</span></button>
+  </div>
+  <label class="mono" for="sala">Sala (igual en ambas computadoras)</label>
+  <input id="sala" value="dunne" maxlength="40" autocomplete="off" spellcheck="false">
+  <label class="mono" for="ini">Empezar en</label>
+  <select id="ini">
+    <option value="index.html">Lobby</option>
+    <option value="circuito.html">Circuito del dibujo</option>
+    <option value="escucha.html">Escucha musical</option>
+    <option value="divergente.html">Pensamiento divergente</option>
+    <option value="modos.html">Modos</option>
+    <option value="humor.html">Humor</option>
+    <option value="flow.html">Flow</option>
+    <option value="visor.html">Visor del cerebro</option>
+  </select>
+  <details><summary>Opciones de red (varias computadoras)</summary>
+    <label class="mono" for="fb">URL de Firebase (opcional si ya está en sync.js)</label>
+    <input id="fb" placeholder="https://mi-proyecto-default-rtdb.firebaseio.com" autocomplete="off" spellcheck="false">
+  </details>
+  <p class="note">El cerebro sigue al panel aunque cambie de simulación. Si el panel abre otra página, la pantalla del cerebro la abre sola.</p>
+</main>
+<script>
+(function(){
+  function go(rol){
+    var sala=(document.getElementById("sala").value||"dunne").replace(/[^A-Za-z0-9_-]/g,"")||"dunne";
+    var fb=document.getElementById("fb").value.trim();
+    try{localStorage.setItem("dunne-sala",sala);localStorage.setItem("dunne-fb",fb);}catch(e){}
+    var q="?rol="+rol+"&sala="+encodeURIComponent(sala)+(fb?"&fb="+encodeURIComponent(fb):"");
+    location.href=document.getElementById("ini").value+q;
+  }
+  try{var s=localStorage.getItem("dunne-sala"),f=localStorage.getItem("dunne-fb");if(s)document.getElementById("sala").value=s;if(f)document.getElementById("fb").value=f;}catch(e){}
+  document.getElementById("bPanel").onclick=function(){go("panel");};
+  document.getElementById("bCerebro").onclick=function(){go("cerebro");};
+})();
+</script>
+</body>
+</html>
