@@ -15,7 +15,7 @@
 
   /* Pega aquí la URL de tu base de datos, p. ej. "https://dunne-expo-default-rtdb.firebaseio.com" (sin / al final).
      Déjala vacía ("") para usar solo varias ventanas en la misma computadora. */
-  var FIREBASE_URL = "https://simulaciones-sincro-default-rtdb.firebaseio.com/";
+  var FIREBASE_URL = "https://simulaciones-sincro-default-rtdb.firebaseio.com";
 
   var P = new URLSearchParams(location.search);
   var ROL = P.get("rol");
@@ -91,113 +91,4 @@
     while (el && el.nodeType === 1 && el !== document.body) {
       if (el.id && document.getElementById(el.id) === el) { parts.unshift("#" + CSS.escape(el.id)); break; }
       var i = 1, s = el; while ((s = s.previousElementSibling)) i++;
-      parts.unshift(el.tagName.toLowerCase() + ":nth-child(" + i + ")");
-      el = el.parentElement;
-    }
-    return parts.join(">");
-  }
-  function snapshot() {
-    var S = window.__sim, out = {};
-    if (!S) return out;
-    Object.keys(S).forEach(function (k) {
-      var v = S[k], t = typeof v;
-      if (SKIP_KEYS[k]) return;
-      if (v === null || t === "number" || t === "boolean" || t === "string") out[k] = v;
-    });
-    return out;
-  }
-
-  /* ================= PANEL ================= */
-  var badge;
-  function panelInit() {
-    badge = document.createElement("div");
-    badge.style.cssText = "position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:60;padding:4px 12px;border-radius:99px;" +
-      "font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.7);" +
-      "border:1px solid rgba(255,255,255,.2);color:#e8ecf4;pointer-events:none";
-    document.body.appendChild(badge);
-    setInterval(drawBadge, 700); drawBadge();
-
-    var pending = null;
-    function sendState() { send({ type: "state", page: PAGE, S: snapshot(), ts: Date.now() }); }
-    function soon() { clearTimeout(pending); pending = setTimeout(sendState, 120); }
-
-    document.addEventListener("click", function (e) {
-      if (!e.isTrusted) return;
-      var b = e.target.closest && e.target.closest("button,[data-v]");
-      if (!b || b.id === "sound" || b.closest("#xrBtn")) return;
-      send({ type: "evt", id: UID + ":" + (++evtN), k: "click", sel: pathOf(b) });
-      soon();
-    }, true);
-
-    var lastSet = {};
-    function onSet(e) {
-      if (!e.isTrusted) return;
-      var t = e.target; if (!t || !t.tagName || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName) || t.id === "sound") return;
-      var sel = pathOf(t), now = Date.now();
-      if (e.type === "input" && t.type === "range" && now - (lastSet[sel] || 0) < 90) return;   // limitar sliders
-      lastSet[sel] = now;
-      send({ type: "evt", id: UID + ":" + (++evtN), k: "set", ev: e.type, sel: sel, value: t.value, checked: !!t.checked });
-      soon();
-    }
-    document.addEventListener("input", onSet, true);
-    document.addEventListener("change", onSet, true);
-
-    setInterval(sendState, 1000);
-    sendState();
-    handlers.push(function (m) {
-      if (m.type === "hello") sendState();
-      else if (m.type === "ack") lastAck = Date.now();
-    });
-  }
-  function drawBadge() {
-    if (!badge) return;
-    var ok = Date.now() - lastAck < 6000;
-    badge.innerHTML = '<span style="color:' + (ok ? "#5fe3a1" : "#ff8419") + '">●</span> sala ' + SALA +
-      " · pantalla cerebro: " + (ok ? "conectada" : "esperando…") + (FB ? " · red" : " · local");
-  }
-
-  /* ================= CEREBRO ================= */
-  function viewerInit() {
-    var st = document.createElement("style");
-    st.textContent =
-      ".topbar,header,#panel,#dock,#start,#tip,#xrBtn,.foot{display:none!important}" +
-      "html,body{cursor:none}" +
-      "@media(min-width:761px){canvas#c,canvas{transform:translateX(190px)}}";   // recentra el cerebro (el sitio lo desplaza a la izquierda para dejar sitio al panel)
-    document.head.appendChild(st);
-
-    var dot = document.createElement("div");
-    dot.style.cssText = "position:fixed;left:8px;bottom:8px;width:8px;height:8px;border-radius:50%;z-index:60;background:#ff8419;opacity:.55;pointer-events:none";
-    document.body.appendChild(dot);
-    setInterval(function () { dot.style.background = Date.now() - lastRecv < 4000 ? "#5fe3a1" : "#ff8419"; }, 800);
-
-    addEventListener("dblclick", function () {
-      var d = document.documentElement;
-      if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {});
-    });
-
-    var el;
-    handlers.push(function (m) {
-      if (m.type === "state") {
-        if (m.page && m.page !== PAGE) { location.replace(urlFor(m.page)); return; }
-        var S = window.__sim; if (!S || !m.S) return;
-        Object.keys(m.S).forEach(function (k) { if (!SKIP_KEYS[k]) S[k] = m.S[k]; });
-      } else if (m.type === "evt") {
-        if (seenEvt[m.id]) return; seenEvt[m.id] = 1;
-        try { el = document.querySelector(m.sel); } catch (e) { el = null; }
-        if (!el) return;
-        if (m.k === "click") el.click();
-        else if (m.k === "set") {
-          if (el.type === "checkbox" || el.type === "radio") el.checked = !!m.checked; else el.value = m.value;
-          el.dispatchEvent(new Event(m.ev || "input", { bubbles: true }));
-        }
-      }
-    });
-    function mute() { var S = window.__sim; if (S && "sound" in S) S.sound = false; }
-    setInterval(mute, 300);
-    setInterval(function () { send({ type: "ack", ts: Date.now() }); }, 2000);
-    send({ type: "hello" }); send({ type: "ack", ts: Date.now() });
-  }
-
-  listenFirebase();
-  if (isPanel) panelInit(); else viewerInit();
-})();
+      parts.unshift(el.tagName.toLowerCase() +
