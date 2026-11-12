@@ -26,7 +26,9 @@
   var UID = Math.random().toString(36).slice(2, 10);
   var isPanel = ROL === "panel";
   var SKIP_KEYS = { sound: 1 };           // el audio solo suena en el panel
-  var evtN = 0, seenEvt = {}, lastAck = 0, lastRecv = 0, baselineDone = false;
+  var evtN = 0, seenEvt = {}, lastRecv = 0, baselineDone = false;
+  var VID; try { VID = sessionStorage.getItem("dunne-vid"); if (!VID) { VID = Math.random().toString(36).slice(2, 10); sessionStorage.setItem("dunne-vid", VID); } } catch (e) { VID = UID; }
+  var seenV = {}, LIVE_MS = 15000;      // panel: pantallas del cerebro vistas (id → última vez); cuentan 15 s sin avisar (da tiempo a cargar otra página)
 
   function qs() {
     var q = "?rol=" + ROL + "&sala=" + encodeURIComponent(SALA);
@@ -63,7 +65,7 @@
     if (!FB) return;
     if (m.type === "state") put("/state", m);
     else if (m.type === "evt") put("/evt", m);
-    else if (m.type === "ack") put("/ack", m);
+    else if (m.type === "ack") put("/viewers/" + VID, m);
     /* "hello" no hace falta con Firebase: el estado queda guardado */
   }
   function listenFirebase() {
@@ -77,9 +79,10 @@
         if (data && data.state) deliver(data.state);
         if (data && data.evt && !baselineDone) seenEvt[data.evt.id] = 1;   // no repetir eventos viejos
         baselineDone = true;
+      } else if (path.indexOf("/viewers/") === 0) {
+        if (data && baselineDone) deliver({ type: "ack", uid: data.uid || path, vid: path.split("/")[2], ts: data.ts });
       } else if (path === "/state" && data) deliver(data);
       else if (path === "/evt" && data) { if (!baselineDone) { baselineDone = true; seenEvt[data.id] = 1; } else deliver(data); }
-      else if (path === "/ack" && data) deliver(data);
     }
     es.addEventListener("put", onEv); es.addEventListener("patch", onEv);
   }
@@ -111,9 +114,9 @@
   var badge;
   function panelInit() {
     badge = document.createElement("div");
-    badge.style.cssText = "position:fixed;right:12px;top:12px;z-index:60;padding:4px 12px;border-radius:99px;" +
-      "font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;background:rgba(0,0,0,.7);" +
-      "border:1px solid rgba(255,255,255,.2);color:#e8ecf4;pointer-events:none";
+    badge.style.cssText = "position:fixed;right:12px;top:12px;z-index:60;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;" +
+      "font:12px ui-monospace,Menlo,Consolas,monospace;letter-spacing:.06em;text-transform:uppercase;color:#e8ecf4;pointer-events:none";
+    if (!document.getElementById("panel")) { badge.style.top = "auto"; badge.style.bottom = "12px"; }   // en el lobby va abajo para no tapar el menú
     document.body.appendChild(badge);
     setInterval(drawBadge, 700); drawBadge();
     panelLayout();
@@ -147,7 +150,7 @@
     sendState();
     handlers.push(function (m) {
       if (m.type === "hello") sendState();
-      else if (m.type === "ack") lastAck = Date.now();
+      else if (m.type === "ack") seenV[m.vid || m.uid] = Date.now();
     });
   }
   /* Panel (pantalla vertical): sin cerebro; todo en una sola columna: título → datos de la simulación → explicación → controles */
@@ -176,9 +179,15 @@
   }
   function drawBadge() {
     if (!badge) return;
-    var ok = Date.now() - lastAck < 6000;
-    badge.innerHTML = '<span style="color:' + (ok ? "#5fe3a1" : "#ff8419") + '">●</span> sala ' + SALA +
-      " · pantalla cerebro: " + (ok ? "conectada" : "esperando…") + (FB ? " · red" : " · local");
+    var now = Date.now(), n = 0;
+    Object.keys(seenV).forEach(function (k) { if (now - seenV[k] < LIVE_MS) n++; });
+    var G = "#5fe3a1", O = "#ff8419";
+    function pill(color, txt) {
+      return '<span style="padding:4px 12px;border-radius:99px;background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.2);white-space:nowrap">' +
+        '<span style="color:' + color + '">●</span> ' + txt + "</span>";
+    }
+    badge.innerHTML = pill(n > 0 ? G : O, "sala " + SALA + (FB ? " · red" : " · local")) +
+      pill(n > 0 ? G : O, n + (n === 1 ? " dispositivo conectado" : " dispositivos conectados"));
   }
 
   /* ================= CEREBRO ================= */
@@ -224,8 +233,9 @@
     setInterval(spin, 1000); spin();
     function mute() { var S = window.__sim; if (S && "sound" in S) S.sound = false; }
     setInterval(mute, 300);
-    setInterval(function () { send({ type: "ack", ts: Date.now() }); }, 2000);
-    send({ type: "hello" }); send({ type: "ack", ts: Date.now() });
+    function ack() { send({ type: "ack", vid: VID, page: PAGE, ts: Date.now() }); }
+    setInterval(ack, 2000);
+    send({ type: "hello" }); ack();
   }
 
   listenFirebase();
